@@ -4,11 +4,14 @@ import com.springboot.todo.dto.DTO;
 import com.springboot.todo.entity.Task;
 import com.springboot.todo.entity.Task.Status;
 import com.springboot.todo.repository.Repository;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+
 import java.time.LocalDate;
 import java.util.*;
 
@@ -22,42 +25,51 @@ class ServiceTest {
     private Repository repository;
 
     @InjectMocks
-    private Service service;
+    private ServiceImpl service;
 
-    @Test
-    void testCreate() {
-        DTO dto = DTO.builder()
+    private DTO testDto;
+
+    @BeforeEach
+    void setUp() {
+        testDto = DTO.builder()
                 .id(1L)
                 .title("Test Task")
                 .description("Test Description")
                 .dueDate(LocalDate.now())
                 .status(Status.TODO)
                 .build();
+    }
 
+    @Test
+    @DisplayName("Создание задачи: должен вернуть DTO после сохранения")
+    void testCreate() {
         Task savedTask = Task.builder()
-                .id(dto.getId())
-                .title(dto.getTitle())
-                .description(dto.getDescription())
-                .dueDate(dto.getDueDate())
-                .status(dto.getStatus())
+                .id(testDto.getId())
+                .title(testDto.getTitle())
+                .description(testDto.getDescription())
+                .dueDate(testDto.getDueDate())
+                .status(testDto.getStatus())
                 .build();
 
         when(repository.save(any(Task.class))).thenReturn(savedTask);
 
-        DTO result = service.create(dto);
+        DTO result = service.create(testDto);
 
         assertNotNull(result);
-        assertEquals(dto.getTitle(), result.getTitle());
+        assertEquals(testDto.getTitle(), result.getTitle());
         verify(repository).save(any(Task.class));
     }
 
     @Test
+    @DisplayName("Получение задач по статусу: сортировка по статусу")
     void testGetAll_withStatusAndSortByStatus() {
         Task task1 = Task.builder()
-                .id(1L).title("Task 1")
+                .id(1L)
+                .title("Task 1")
                 .status(Status.TODO)
                 .dueDate(LocalDate.now())
                 .build();
+
         when(repository.findByStatus(Status.TODO)).thenReturn(List.of(task1));
 
         List<DTO> result = service.getAll(Status.TODO, "status");
@@ -68,20 +80,20 @@ class ServiceTest {
     }
 
     @Test
+    @DisplayName("Получение всех задач: сортировка по дате выполнения")
     void testGetAll_withoutStatusAndSortByDueDate() {
         Task task1 = Task.builder()
                 .id(1L)
                 .title("A")
                 .status(Status.TODO)
-                .dueDate(LocalDate.now()
-                        .plusDays(2))
+                .dueDate(LocalDate.now().plusDays(2))
                 .build();
+
         Task task2 = Task.builder()
                 .id(2L)
                 .title("B")
                 .status(Status.TODO)
-                .dueDate(LocalDate.now()
-                        .plusDays(1))
+                .dueDate(LocalDate.now().plusDays(1))
                 .build();
 
         when(repository.findAll()).thenReturn(List.of(task1, task2));
@@ -94,6 +106,7 @@ class ServiceTest {
     }
 
     @Test
+    @DisplayName("Обновление существующей задачи: должны обновиться поля")
     void testUpdate_existingTask() {
         Long id = 1L;
         Task existingTask = Task.builder()
@@ -123,6 +136,7 @@ class ServiceTest {
     }
 
     @Test
+    @DisplayName("Обновление несуществующей задачи: должно выброситься исключение")
     void testUpdate_taskNotFound_shouldThrow() {
         Long id = 999L;
         DTO dto = DTO.builder().id(id).build();
@@ -133,10 +147,13 @@ class ServiceTest {
     }
 
     @Test
+    @DisplayName("Удаление задачи по ID: должен вызваться deleteById")
     void testDelete() {
         Long id = 1L;
         doNothing().when(repository).deleteById(id);
+
         service.delete(id);
+
         verify(repository).deleteById(id);
     }
 }

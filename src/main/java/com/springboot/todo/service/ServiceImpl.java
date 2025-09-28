@@ -6,32 +6,25 @@ import com.springboot.todo.entity.Task.Status;
 import com.springboot.todo.repository.Repository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Comparator;
+import java.util.NoSuchElementException;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
-@org.springframework.stereotype.Service
+@Service
 @RequiredArgsConstructor
-public class Service {
+public class ServiceImpl implements TaskService {
 
     private final Repository repository;
-
-    //Преобразуем задачу в объект DTO
-    private DTO taskToDTO(Task task) {
-        return DTO.builder()
-                .id(task.getId())
-                .title(task.getTitle())
-                .description(task.getDescription())
-                .dueDate(task.getDueDate())
-                .status(task.getStatus())
-                .build();
-    }
 
     /*Создаем задачу(берем из dto через getter поля, через builder создаем task, сохраняем в репозиторий и затем
     преобразуем task обратно в dto и возвращаем
      */
     @Transactional
+    @Override
     public DTO create(DTO dto) {
         Task task = Task.builder()
                 .id(dto.getId())
@@ -40,8 +33,14 @@ public class Service {
                 .dueDate(dto.getDueDate())
                 .status(dto.getStatus())
                 .build();
+        Optional<Task> existing = repository.findByTitleAndDueDate(dto.getTitle(), dto.getDueDate());
+        if (existing.isPresent()) {
+            throw new IllegalArgumentException("Такая задача уже существует");
+        }
         repository.save(task);
-        return taskToDTO(task);
+        DTO createDto = Mapper.taskToDTO(task);
+        return createDto;
+
     }
 
     //компоратор сортирует задачи по входному параметру либо по status либо по dueDate
@@ -54,17 +53,19 @@ public class Service {
     }
 
     @Transactional(readOnly = true)
+    @Override
     public List<DTO> getAll(Status status, String sortBy) {
         //если не нужны задачи с определенным статусом, возвращаем все задачи
         List<Task> tasks = (status != null) ? repository.findByStatus(status) : repository.findAll();
-
-        return tasks.stream()
+        List<DTO> tasksDTO = tasks.stream()
                 .sorted(getComparator(sortBy))
-                .map(task -> taskToDTO(task))
+                .map(task -> Mapper.taskToDTO(task))
                 .collect(Collectors.toList());
+        return tasksDTO;
     }
 
     @Transactional
+    @Override
     public DTO update(Long id, DTO dto) {
         //ищем по id либо кидаем NoSuchElementException
         Task task = repository.findById(id).orElseThrow();
@@ -73,10 +74,12 @@ public class Service {
         task.setDueDate(dto.getDueDate());
         task.setStatus(dto.getStatus());
         repository.save(task);
-        return taskToDTO(task);
+        DTO updateDto = Mapper.taskToDTO(task);
+        return updateDto;
     }
 
     @Transactional
+    @Override
     public void delete(Long id) {
         repository.deleteById(id);
     }
